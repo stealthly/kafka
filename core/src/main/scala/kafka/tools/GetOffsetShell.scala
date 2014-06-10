@@ -57,6 +57,10 @@ object GetOffsetShell {
                            .describedAs("ms")
                            .ofType(classOf[java.lang.Integer])
                            .defaultsTo(1000)
+    val securityConfigFileOpt = parser.accepts("security.config.file", "Security config file to use for SSL.")
+                           .withRequiredArg
+                           .describedAs("property file")
+                           .ofType(classOf[java.lang.String])
 
     val options = parser.parse(args : _*)
 
@@ -69,8 +73,9 @@ object GetOffsetShell {
     var time = options.valueOf(timeOpt).longValue
     val nOffsets = options.valueOf(nOffsetsOpt).intValue
     val maxWaitMs = options.valueOf(maxWaitMsOpt).intValue()
+    val secure = options.has(securityConfigFileOpt)
 
-    val topicsMetadata = ClientUtils.fetchTopicMetadata(Set(topic), metadataTargetBrokers, clientId, maxWaitMs).topicsMetadata
+    val topicsMetadata = ClientUtils.fetchTopicMetadata(Set(topic), metadataTargetBrokers, clientId, options.valueOf(securityConfigFileOpt), maxWaitMs).topicsMetadata
     if(topicsMetadata.size != 1 || !topicsMetadata(0).topic.equals(topic)) {
       System.err.println(("Error: no valid topic metadata for topic: %s, " + " probably the topic does not exist, run ").format(topic) +
         "kafka-list-topic.sh to verify")
@@ -88,7 +93,7 @@ object GetOffsetShell {
         case Some(metadata) =>
           metadata.leader match {
             case Some(leader) =>
-              val consumer = new SimpleConsumer(leader.host, leader.port, 10000, 100000, clientId)
+              val consumer = new SimpleConsumer(leader.host, leader.port, 10000, 100000, clientId, secure, options.valueOf(securityConfigFileOpt))
               val topicAndPartition = TopicAndPartition(topic, partitionId)
               val request = OffsetRequest(Map(topicAndPartition -> PartitionOffsetRequestInfo(time, nOffsets)))
               val offsets = consumer.getOffsetsBefore(request).partitionErrorAndOffsets(topicAndPartition).offsets

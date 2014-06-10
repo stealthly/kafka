@@ -36,10 +36,12 @@ class SocketServerTest extends JUnitSuite {
   val server: SocketServer = new SocketServer(0,
                                               host = null,
                                               port = kafka.utils.TestUtils.choosePort,
+                                              secure = false,
+                                              securityConfig = null,
                                               numProcessorThreads = 1,
                                               maxQueuedRequests = 50,
                                               sendBufferSize = 300000,
-                                              recvBufferSize = 300000,
+                                              receiveBufferSize = 300000,
                                               maxRequestSize = 50)
   server.startup()
 

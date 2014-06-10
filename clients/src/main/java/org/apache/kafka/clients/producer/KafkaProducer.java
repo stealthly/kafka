@@ -40,6 +40,8 @@ import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.MetricsReporter;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.network.Selector;
+import org.apache.kafka.common.network.security.AuthConfig;
+import org.apache.kafka.common.network.security.SecureAuth;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.record.Record;
 import org.apache.kafka.common.record.Records;
@@ -73,6 +75,7 @@ public class KafkaProducer implements Producer {
     private final Thread ioThread;
     private final CompressionType compressionType;
     private final Sensor errors;
+    private final boolean secure;
 
     /**
      * A producer is instantiated by providing a set of key-value pairs as configuration. Valid configuration strings
@@ -120,7 +123,16 @@ public class KafkaProducer implements Producer {
                                                  time);
         List<InetSocketAddress> addresses = ClientUtils.parseAndValidateAddresses(config.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG));
         this.metadata.update(Cluster.bootstrap(addresses), time.milliseconds());
-        this.sender = new Sender(new Selector(this.metrics, time),
+        this.secure = config.getBoolean(ProducerConfig.SECURE);
+        if (secure) {
+            try {
+                SecureAuth.initialize(new AuthConfig(config.getString(ProducerConfig.SECURITY_CONFIG_FILE)));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        this.sender = new Sender(new Selector(this.metrics, time, config.getBoolean(ProducerConfig.SECURE)),
                                  this.metadata,
                                  this.accumulator,
                                  clientId,

@@ -175,6 +175,9 @@ class ConsumerConfig private (val props: VerifiableProperties) extends ZKConfig(
   /** Whether messages from internal topics (such as offsets) should be exposed to the consumer. */
   val excludeInternalTopics = props.getBoolean("exclude.internal.topics", ExcludeInternalTopics)
 
+  /** security config file */
+  val securityConfigFile = props.getString("security.config.file", null)
+
   validate(this)
 }
 

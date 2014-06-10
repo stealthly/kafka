@@ -37,7 +37,7 @@ object ConsumerOffsetChecker extends Logging {
   private val offsetMap: mutable.Map[TopicAndPartition, Long] = mutable.Map()
   private var topicPidMap: immutable.Map[String, Seq[Int]] = immutable.Map()
 
-  private def getConsumer(zkClient: ZkClient, bid: Int): Option[SimpleConsumer] = {
+  private def getConsumer(zkClient: ZkClient, bid: Int, securityConfigFile : String): Option[SimpleConsumer] = {
     try {
       ZkUtils.readDataMaybeNull(zkClient, ZkUtils.BrokerIdsPath + "/" + bid)._1 match {
         case Some(brokerInfoString) =>
@@ -46,7 +46,8 @@ object ConsumerOffsetChecker extends Logging {
               val brokerInfo = m.asInstanceOf[Map[String, Any]]
               val host = brokerInfo.get("host").get.asInstanceOf[String]
               val port = brokerInfo.get("port").get.asInstanceOf[Int]
-              Some(new SimpleConsumer(host, port, 10000, 100000, "ConsumerOffsetChecker"))
+              val secure = brokerInfo.get("secure").get.asInstanceOf[Boolean]
+              Some(new SimpleConsumer(host, port, 10000, 100000, "ConsumerOffsetChecker", secure, securityConfigFile))
             case None =>
               throw new BrokerNotAvailableException("Broker id %d does not exist".format(bid))
           }
@@ -61,14 +62,14 @@ object ConsumerOffsetChecker extends Logging {
   }
 
   private def processPartition(zkClient: ZkClient,
-                               group: String, topic: String, pid: Int) {
+                               group: String, topic: String, pid: Int, securityConfigFile : String) {
     val topicPartition = TopicAndPartition(topic, pid)
     val offsetOpt = offsetMap.get(topicPartition)
     val groupDirs = new ZKGroupTopicDirs(group, topic)
     val owner = ZkUtils.readDataMaybeNull(zkClient, groupDirs.consumerOwnerDir + "/%s".format(pid))._1
     ZkUtils.getLeaderForPartition(zkClient, topic, pid) match {
       case Some(bid) =>
-        val consumerOpt = consumerMap.getOrElseUpdate(bid, getConsumer(zkClient, bid))
+        val consumerOpt = consumerMap.getOrElseUpdate(bid, getConsumer(zkClient, bid, securityConfigFile))
         consumerOpt match {
           case Some(consumer) =>
             val topicAndPartition = TopicAndPartition(topic, pid)
@@ -86,11 +87,11 @@ object ConsumerOffsetChecker extends Logging {
     }
   }
 
-  private def processTopic(zkClient: ZkClient, group: String, topic: String) {
+  private def processTopic(zkClient: ZkClient, group: String, topic: String, securityConfigFile : String) {
     topicPidMap.get(topic) match {
       case Some(pids) =>
         pids.sorted.foreach {
-          pid => processPartition(zkClient, group, topic, pid)
+          pid => processPartition(zkClient, group, topic, pid, securityConfigFile)
         }
       case None => // ignore
     }
@@ -123,12 +124,21 @@ object ConsumerOffsetChecker extends Logging {
 
     parser.accepts("broker-info", "Print broker info")
     parser.accepts("help", "Print this message.")
+    val securityConfigFileOpt = parser.accepts("security.config.file", "Security config file to use for SSL.")
+                                  .withRequiredArg
+                                  .describedAs("property file")
+                                  .ofType(classOf[java.lang.String])
 
     val options = parser.parse(args : _*)
+    var securityConfigFile:String = null;
 
     if (options.has("help")) {
        parser.printHelpOn(System.out)
        System.exit(0)
+    }
+
+    if (options.has(securityConfigFileOpt)){
+       securityConfigFile = options.valueOf(securityConfigFileOpt);
     }
 
     for (opt <- List(groupOpt, zkConnectOpt))
@@ -193,7 +203,7 @@ object ConsumerOffsetChecker extends Logging {
 
       println("%-15s %-30s %-3s %-15s %-15s %-15s %s".format("Group", "Topic", "Pid", "Offset", "logSize", "Lag", "Owner"))
       topicList.sorted.foreach {
-        topic => processTopic(zkClient, group, topic)
+        topic => processTopic(zkClient, group, topic, securityConfigFile)
       }
 
       if (options.has("broker-info"))

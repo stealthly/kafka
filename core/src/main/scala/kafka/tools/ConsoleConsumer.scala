@@ -83,6 +83,10 @@ object ConsoleConsumer extends Logging {
       .withRequiredArg
       .describedAs("metrics dictory")
       .ofType(classOf[java.lang.String])
+    val securityConfigFileOpt = parser.accepts("security.config.file", "Security config file to use for SSL.")
+      .withRequiredArg
+      .describedAs("property file")
+      .ofType(classOf[java.lang.String])
 
     var groupIdPassed = true
     val options: OptionSet = tryParse(parser, args)
@@ -136,6 +140,9 @@ object ConsoleConsumer extends Logging {
       System.err.println("Found previous offset information for this group "+consumerProps.getProperty("group.id")
         +". Please use --delete-consumer-offsets to delete previous offsets metadata")
       System.exit(1)
+    }
+    if (options.has(securityConfigFileOpt)) {
+      consumerProps.put("security.config.file", options.valueOf(securityConfigFileOpt))
     }
 
     if(options.has(deleteConsumerOffsetsOpt))

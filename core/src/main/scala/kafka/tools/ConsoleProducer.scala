@@ -27,6 +27,7 @@ import java.util.Properties
 import java.io._
 
 import joptsimple._
+import kafka.network.security.AuthConfig
 
 object ConsoleProducer {
 
@@ -59,6 +60,8 @@ object ConsoleProducer {
             props.put(ProducerConfig.BUFFER_MEMORY_CONFIG, config.maxMemoryBytes.toString)
             props.put(ProducerConfig.BATCH_SIZE_CONFIG, config.maxPartitionMemoryBytes.toString)
             props.put(ProducerConfig.CLIENT_ID_CONFIG, "console-producer")
+            props.put(ProducerConfig.SECURE, config.secure.toString)
+            if (config.securityConfig != null) props.put(ProducerConfig.SECURITY_CONFIG_FILE, config.securityConfig)
 
             new NewShinyProducer(props)
           } else {
@@ -78,6 +81,8 @@ object ConsoleProducer {
             props.put("send.buffer.bytes", config.socketBuffer.toString)
             props.put("topic.metadata.refresh.interval.ms", config.metadataExpiryMs.toString)
             props.put("client.id", "console-producer")
+            props.put("secure", config.secure.toString)
+            if (config.securityConfig != null) props.put("security.config.file", config.securityConfig)
 
             new OldProducer(props)
           }
@@ -210,6 +215,11 @@ object ConsoleProducer {
       .describedAs("prop")
       .ofType(classOf[String])
     val useNewProducerOpt = parser.accepts("new-producer", "Use the new producer implementation.")
+    val secureOpt = parser.accepts("secure", "Whether SSL enabled").withOptionalArg()
+    val securityConfigFileOpt = parser.accepts("client.security.file", "Security config file to use for SSL.")
+      .withRequiredArg
+      .describedAs("property file")
+      .ofType(classOf[java.lang.String])
 
     val options = parser.parse(args : _*)
     for(arg <- List(topicOpt, brokerListOpt)) {
@@ -249,6 +259,9 @@ object ConsoleProducer {
     val maxPartitionMemoryBytes = options.valueOf(maxPartitionMemoryBytesOpt)
     val metadataExpiryMs = options.valueOf(metadataExpiryMsOpt)
     val metadataFetchTimeoutMs = options.valueOf(metadataFetchTimeoutMsOpt)
+
+    val secure = options.has(secureOpt)
+    val securityConfig = options.valueOf(securityConfigFileOpt)
   }
 
   trait MessageReader {

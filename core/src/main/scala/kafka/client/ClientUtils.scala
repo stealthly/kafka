@@ -28,6 +28,7 @@ import util.Random
  import kafka.utils.ZkUtils._
  import org.I0Itec.zkclient.ZkClient
  import java.io.IOException
+ import java.util.concurrent.TimeUnit
 
  /**
  * Helper functions common to clients (producer, consumer, or admin)
@@ -82,12 +83,17 @@ object ClientUtils extends Logging{
    * @param clientId The client's identifier
    * @return topic metadata response
    */
-  def fetchTopicMetadata(topics: Set[String], brokers: Seq[Broker], clientId: String, timeoutMs: Int,
+  def fetchTopicMetadata(topics: Set[String], brokers: Seq[Broker], clientId: String, securityConfigFile: String, timeoutMs: Int,
                          correlationId: Int = 0): TopicMetadataResponse = {
     val props = new Properties()
     props.put("metadata.broker.list", brokers.map(_.getConnectionString()).mkString(","))
     props.put("client.id", clientId)
     props.put("request.timeout.ms", timeoutMs.toString)
+    if (securityConfigFile != null){
+      props.put("secure", "true")
+    	props.put("security.config.file", securityConfigFile)
+    }
+
     val producerConfig = new ProducerConfig(props)
     fetchTopicMetadata(topics, brokers, producerConfig, correlationId)
   }
@@ -104,7 +110,8 @@ object ClientUtils extends Logging{
       val brokerInfos = brokerStr.split(":")
       val hostName = brokerInfos(0)
       val port = brokerInfos(1).toInt
-      new Broker(brokerId, hostName, port)
+      val secure = if (brokerInfos.length > 2) brokerInfos(2).toBoolean else false
+      new Broker(brokerId, hostName, port, secure)
     })
   }
 
@@ -119,7 +126,7 @@ object ClientUtils extends Logging{
        Random.shuffle(allBrokers).find { broker =>
          trace("Connecting to broker %s:%d.".format(broker.host, broker.port))
          try {
-           channel = new BlockingChannel(broker.host, broker.port, BlockingChannel.UseDefaultBufferSize, BlockingChannel.UseDefaultBufferSize, socketTimeoutMs)
+           channel = new BlockingChannel(broker.host, broker.port, broker.secure, BlockingChannel.UseDefaultBufferSize, BlockingChannel.UseDefaultBufferSize, socketTimeoutMs)
            channel.connect()
            debug("Created channel to broker %s:%d.".format(channel.host, channel.port))
            true
@@ -176,7 +183,7 @@ object ClientUtils extends Logging{
          var offsetManagerChannel: BlockingChannel = null
          try {
            debug("Connecting to offset manager %s.".format(connectString))
-           offsetManagerChannel = new BlockingChannel(coordinator.host, coordinator.port,
+           offsetManagerChannel = new BlockingChannel(coordinator.host, coordinator.port, coordinator.secure,
                                                       BlockingChannel.UseDefaultBufferSize,
                                                       BlockingChannel.UseDefaultBufferSize,
                                                       socketTimeoutMs)

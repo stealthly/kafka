@@ -21,6 +21,7 @@ import java.util.Properties
 import kafka.message.{MessageSet, Message}
 import kafka.consumer.ConsumerConfig
 import kafka.utils.{VerifiableProperties, ZKConfig, Utils}
+import kafka.network.security.AuthConfig
 
 /**
  * Configuration settings for the kafka server
@@ -67,6 +68,15 @@ class KafkaConfig private (val props: VerifiableProperties) extends ZKConfig(pro
 
   /* the port to listen and accept connections on */
   val port: Int = props.getInt("port", 6667)
+
+  /* is this running SSL */
+  val secure: Boolean = props.getBoolean("secure", false)
+
+  /* security config */
+  val securityConfig = if (secure)
+    new AuthConfig(props.getString("security.config.file"))
+  else
+    null
 
   /* hostname of broker. If this is set, it will only bind to this address. If this is not set,
    * it will bind to all interfaces */

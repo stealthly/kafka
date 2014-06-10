@@ -18,9 +18,10 @@
 package kafka.producer
 
 import java.util.Properties
-import kafka.utils.VerifiableProperties
+import kafka.utils._
+import kafka.network.security.AuthConfig
 
-class SyncProducerConfig private (val props: VerifiableProperties) extends SyncProducerConfigShared {
+class SyncProducerConfig private (val props: VerifiableProperties) extends SyncProducerConfigShared with Logging {
   def this(originalProps: Properties) {
     this(new VerifiableProperties(originalProps))
     // no need to verify the property since SyncProducerConfig is supposed to be used internally
@@ -31,6 +32,15 @@ class SyncProducerConfig private (val props: VerifiableProperties) extends SyncP
 
   /** the port on which the broker is running */
   val port = props.getInt("port")
+
+  /** determines whether use SSL or not */
+  val secure = props.getBoolean("secure")
+
+  /** security config */
+  val securityConfig = if (secure) {
+      info("Secure sockets for data transfer is enabled");
+      new AuthConfig(props.getString("security.config.file", null))
+    } else null
 }
 
 trait SyncProducerConfigShared {

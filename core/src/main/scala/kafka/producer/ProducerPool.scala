@@ -34,6 +34,7 @@ object ProducerPool {
     val props = new Properties()
     props.put("host", broker.host)
     props.put("port", broker.port.toString)
+    props.put("secure", broker.secure.toString)
     props.putAll(config.props.props)
     new SyncProducer(new SyncProducerConfig(props))
   }

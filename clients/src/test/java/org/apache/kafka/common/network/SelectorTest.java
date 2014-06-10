@@ -50,7 +50,7 @@ public class SelectorTest {
     public void setup() throws Exception {
         this.server = new EchoServer();
         this.server.start();
-        this.selector = new Selector(new Metrics(), new MockTime());
+        this.selector = new Selector(new Metrics(), new MockTime(), false);
     }
 
     @After

@@ -21,6 +21,7 @@ import kafka.api._
 import kafka.network.{BlockingChannel, BoundedByteBufferSend, Receive}
 import kafka.utils._
 import java.util.Random
+import kafka.network.security.SecureAuth
 
 object SyncProducer {
   val RequestKey: Short = 0
@@ -35,7 +36,11 @@ class SyncProducer(val config: SyncProducerConfig) extends Logging {
 
   private val lock = new Object()
   @volatile private var shutdown: Boolean = false
-  private val blockingChannel = new BlockingChannel(config.host, config.port, BlockingChannel.UseDefaultBufferSize,
+
+  // If secure setup SSLContext
+  if (config.secure) SecureAuth.initialize(config.securityConfig)
+
+  private val blockingChannel = new BlockingChannel(config.host, config.port, config.secure, BlockingChannel.UseDefaultBufferSize,
     config.sendBufferBytes, config.requestTimeoutMs)
   val brokerInfo = "host_%s-port_%s".format(config.host, config.port)
   val producerRequestStats = ProducerRequestStatsRegistry.getProducerRequestStats(config.clientId)
@@ -126,8 +131,10 @@ class SyncProducer(val config: SyncProducerConfig) extends Logging {
    */
   private def disconnect() {
     try {
-      info("Disconnecting from " + config.host + ":" + config.port)
-      blockingChannel.disconnect()
+      if(blockingChannel.isConnected) {
+        info("Disconnecting from " + config.host + ":" + config.port + ":" + config.secure)
+        blockingChannel.disconnect()
+      }
     } catch {
       case e: Exception => error("Error on disconnect: ", e)
     }
@@ -137,11 +144,11 @@ class SyncProducer(val config: SyncProducerConfig) extends Logging {
     if (!blockingChannel.isConnected && !shutdown) {
       try {
         blockingChannel.connect()
-        info("Connected to " + config.host + ":" + config.port + " for producing")
+        info("Connected to " + config.host + ":" + config.port + ":" + config.secure + " for producing")
       } catch {
         case e: Exception => {
           disconnect()
-          error("Producer connection to " +  config.host + ":" + config.port + " unsuccessful", e)
+          error("Producer connection to " +  config.host + ":" + config.port + ":" + config.secure + " unsuccessful", e)
           throw e
         }
       }

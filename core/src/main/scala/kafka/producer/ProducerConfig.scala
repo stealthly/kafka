@@ -22,6 +22,7 @@ import java.util.Properties
 import kafka.utils.{Utils, VerifiableProperties}
 import kafka.message.{CompressionCodec, NoCompressionCodec}
 import kafka.common.{InvalidConfigException, Config}
+import kafka.network.security.AuthConfig
 
 object ProducerConfig extends Config {
   def validate(config: ProducerConfig) {
@@ -112,6 +113,15 @@ class ProducerConfig private (val props: VerifiableProperties)
    * a message the metadata is never refreshed
    */
   val topicMetadataRefreshIntervalMs = props.getInt("topic.metadata.refresh.interval.ms", 600000)
+
+  /** determines whether use SSL or not */
+  val secure = props.getBoolean("secure", false)
+
+  /** security config */
+  val securityConfig = if (secure) {
+    info("Secure sockets for data transfer is enabled");
+    new AuthConfig(props.getString("security.config.file", null))
+  } else null
 
   validate(this)
 }

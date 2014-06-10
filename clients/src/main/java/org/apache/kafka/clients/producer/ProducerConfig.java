@@ -171,6 +171,14 @@ public class ProducerConfig extends AbstractConfig {
     public static final String MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION = "max.in.flight.requests.per.connection";
     private static final String MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION_DOC = "The maximum number of unacknowledged requests the client will send on a single connection before blocking.";
 
+    /** <code>secure</code> */
+    public static final String SECURE = "secure";
+    private static final String SECURE_DOC = "Determines whether use SSL of not.";
+
+    /** <code>security.config.file</code> */
+    public static final String SECURITY_CONFIG_FILE = "security.config.file";
+    private static final String SECURITY_CONFIG_FILE_DOC = "Determines whether use SSL of not.";
+
     static {
         config = new ConfigDef().define(BOOTSTRAP_SERVERS_CONFIG, Type.LIST, Importance.HIGH, BOOSTRAP_SERVERS_DOC)
                                 .define(BUFFER_MEMORY_CONFIG, Type.LONG, 32 * 1024 * 1024L, atLeast(0L), Importance.HIGH, BUFFER_MEMORY_DOC)
@@ -212,7 +220,17 @@ public class ProducerConfig extends AbstractConfig {
                                         5,
                                         atLeast(1),
                                         Importance.LOW,
-                                        MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION_DOC);
+                                        MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION_DOC)
+                                .define(SECURE,
+                                        Type.BOOLEAN,
+                                        false,
+                                        Importance.LOW,
+                                        SECURE_DOC)
+                                .define(SECURITY_CONFIG_FILE,
+                                        Type.STRING,
+                                        "config/client.security.properties",
+                                        Importance.LOW,
+                                        SECURITY_CONFIG_FILE_DOC);
     }
 
     ProducerConfig(Map<? extends Object, ? extends Object> props) {

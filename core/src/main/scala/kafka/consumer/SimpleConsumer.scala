@@ -21,6 +21,7 @@ import kafka.api._
 import kafka.network._
 import kafka.utils._
 import kafka.common.{ErrorMapping, TopicAndPartition}
+import kafka.network.security.{AuthConfig, SecureAuth}
 
 /**
  * A consumer of kafka messages
@@ -30,11 +31,22 @@ class SimpleConsumer(val host: String,
                      val port: Int,
                      val soTimeout: Int,
                      val bufferSize: Int,
-                     val clientId: String) extends Logging {
+                     val clientId: String,
+                     val secure: Boolean = false,
+                     val securityConfigFile: String = null) extends Logging {
 
   ConsumerConfig.validateClientId(clientId)
   private val lock = new Object()
-  private val blockingChannel = new BlockingChannel(host, port, bufferSize, BlockingChannel.UseDefaultBufferSize, soTimeout)
+
+  if (secure) {
+    synchronized {
+      if (!SecureAuth.isInitialized){
+        SecureAuth.initialize(new AuthConfig(securityConfigFile))
+      }
+    }
+  }
+
+  private val blockingChannel = new BlockingChannel(host, port, secure, bufferSize, BlockingChannel.UseDefaultBufferSize, soTimeout)
   val brokerInfo = "host_%s-port_%s".format(host, port)
   private val fetchRequestAndResponseStats = FetchRequestAndResponseStatsRegistry.getFetchRequestAndResponseStats(clientId)
   private var isClosed = false

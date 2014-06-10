@@ -76,7 +76,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime) extends Logg
 
     /* start scheduler */
     kafkaScheduler.startup()
-    
+
     /* setup zookeeper */
     zkClient = initZk()
 
@@ -87,6 +87,8 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime) extends Logg
     socketServer = new SocketServer(config.brokerId,
                                     config.hostName,
                                     config.port,
+                                    config.secure,
+                                    config.securityConfig,
                                     config.numNetworkThreads,
                                     config.queuedMaxRequests,
                                     config.socketSendBufferBytes,
@@ -100,31 +102,31 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime) extends Logg
     offsetManager = createOffsetManager()
 
     kafkaController = new KafkaController(config, zkClient, brokerState)
-    
+
     /* start processing requests */
     apis = new KafkaApis(socketServer.requestChannel, replicaManager, offsetManager, zkClient, config.brokerId, config, kafkaController)
     requestHandlerPool = new KafkaRequestHandlerPool(config.brokerId, socketServer.requestChannel, apis, config.numIoThreads)
     brokerState.newState(RunningAsBroker)
-   
+
     Mx4jLoader.maybeLoad()
 
     replicaManager.startup()
 
     kafkaController.startup()
-    
+
     topicConfigManager = new TopicConfigManager(zkClient, logManager)
     topicConfigManager.startup()
-    
+
     /* tell everyone we are alive */
-    kafkaHealthcheck = new KafkaHealthcheck(config.brokerId, config.advertisedHostName, config.advertisedPort, config.zkSessionTimeoutMs, zkClient)
+    kafkaHealthcheck = new KafkaHealthcheck(config.brokerId, config.advertisedHostName, config.advertisedPort, config.secure, config.zkSessionTimeoutMs, zkClient)
     kafkaHealthcheck.startup()
 
-    
+
     registerStats()
     startupComplete.set(true)
     info("started")
   }
-  
+
   private def initZk(): ZkClient = {
     info("Connecting to zookeeper on " + config.zkConnect)
     val zkClient = new ZkClient(config.zkConnect, config.zkSessionTimeoutMs, config.zkConnectionTimeoutMs, ZKStringSerializer)
@@ -172,7 +174,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime) extends Logg
                 if (channel != null) {
                   channel.disconnect()
                 }
-                channel = new BlockingChannel(broker.host, broker.port,
+                channel = new BlockingChannel(broker.host, broker.port, broker.secure,
                   BlockingChannel.UseDefaultBufferSize,
                   BlockingChannel.UseDefaultBufferSize,
                   config.controllerSocketTimeoutMs)
@@ -272,9 +274,9 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime) extends Logg
   def awaitShutdown(): Unit = shutdownLatch.await()
 
   def getLogManager(): LogManager = logManager
-  
+
   private def createLogManager(zkClient: ZkClient, brokerState: BrokerState): LogManager = {
-    val defaultLogConfig = LogConfig(segmentSize = config.logSegmentBytes, 
+    val defaultLogConfig = LogConfig(segmentSize = config.logSegmentBytes,
                                      segmentMs = 60L * 60L * 1000L * config.logRollHours,
                                      flushInterval = config.logFlushIntervalMessages,
                                      flushMs = config.logFlushIntervalMs.toLong,

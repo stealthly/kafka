@@ -19,6 +19,7 @@ import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.UnresolvedAddressException;
+import java.nio.channels.spi.SelectorProvider;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.kafka.clients.producer.internals.SSLSocketChannel;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.metrics.Measurable;
 import org.apache.kafka.common.metrics.MetricConfig;
@@ -36,6 +38,7 @@ import org.apache.kafka.common.metrics.stats.Avg;
 import org.apache.kafka.common.metrics.stats.Count;
 import org.apache.kafka.common.metrics.stats.Max;
 import org.apache.kafka.common.metrics.stats.Rate;
+import org.apache.kafka.common.network.security.SecureAuth;
 import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,11 +83,12 @@ public class Selector implements Selectable {
     private final List<Integer> connected;
     private final Time time;
     private final SelectorMetrics sensors;
+    private final boolean secure;
 
     /**
      * Create a new selector
      */
-    public Selector(Metrics metrics, Time time) {
+    public Selector(Metrics metrics, Time time, boolean secure) {
         try {
             this.selector = java.nio.channels.Selector.open();
         } catch (IOException e) {
@@ -97,6 +101,7 @@ public class Selector implements Selectable {
         this.connected = new ArrayList<Integer>();
         this.disconnected = new ArrayList<Integer>();
         this.sensors = new SelectorMetrics(metrics);
+        this.secure = secure;
     }
 
     /**
@@ -117,7 +122,7 @@ public class Selector implements Selectable {
         if (this.keys.containsKey(id))
             throw new IllegalStateException("There is already a connection for id " + id);
 
-        SocketChannel channel = SocketChannel.open();
+        SocketChannel channel = secure ? SSLSocketChannel.create(SocketChannel.open(), address.getHostString(), address.getPort()) : SocketChannel.open();
         channel.configureBlocking(false);
         Socket socket = channel.socket();
         socket.setKeepAlive(true);
